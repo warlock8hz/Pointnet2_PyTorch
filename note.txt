@@ -1,0 +1,57 @@
+# 0. cuda 10.1 and python 3.5 are required in running this reposity
+## 1. training requires only python 3, this means 3.5/3.6/.../3.9 are theorically acceptable
+## 2. tox.ini requires python 3.5 or 3.6
+## 3. the dependency (pytest-helpers-namespace) of tox requires python 2.7/3.4/3.5
+#
+# 1. make sure the cuda toolkit is properly installed (https://medium.com/@exesse/cuda-10-1-installation-on-ubuntu-18-04-lts-d04f89287130)
+## 1. Start terminal and remove any NVIDIA traces you may have on your machine.
+## sudo rm /etc/apt/sources.list.d/cuda*
+## sudo apt remove --autoremove nvidia-cuda-toolkit
+## sudo apt remove --autoremove nvidia-*
+## 2. Setup the correct CUDA PPA on your system
+## sudo apt update
+## sudo add-apt-repository ppa:graphics-drivers
+## sudo apt-key adv --fetch-keys  http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub
+## sudo bash -c 'echo "deb http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64 /" > /etc/apt/sources.list.d/cuda.list'
+## sudo bash -c 'echo "deb http://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1804/x86_64 /" > /etc/apt/sources.list.d/cuda_learn.list'
+## 3. Install CUDA 10.1 packages
+## sudo apt update
+## sudo apt install cuda-10-1
+## sudo apt install libcudnn7
+## 4. As the last step one need to specify PATH to CUDA in ‘.profile’ file. Open the file by running:
+## sudo vi ~/.profile
+## And add the following lines at the end of the file:
+## # set PATH for cuda 10.1 installation
+## if [ -d "/usr/local/cuda-10.1/bin/" ]; then
+##     export PATH=/usr/local/cuda-10.1/bin${PATH:+:${PATH}}
+##     export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
+## fi
+## 5. Restart and check the versions for the installation.
+## CUDA:
+## nvcc  – version
+## nvcc: NVIDIA (R) Cuda compiler driver
+## Copyright (c) 2005-2019 NVIDIA Corporation
+## Built on Wed_Apr_24_19:10:27_PDT_2019
+## Cuda compilation tools, release 10.1, V10.1.168
+## NVIDIA Driver:
+## nvidia-smi
+## libcudnn:
+## /sbin/ldconfig -N -v $(sed ‘s/:/ /’ <<< $LD_LIBRARY_PATH) 2>/dev/null | grep libcudnn
+#
+# 2. link the head file stored in cuda 10.2 folder by 
+# $ sudo ln -s /usr/local/cuda-10.2/targets/x86_64-linux/include/cublas_v2.h /usr/include/cublas_v2.h
+# and 
+# $ sudo ln -s /usr/local/cuda-10.2/targets/x86_64-linux/include/cublas_api.h /usr/include/cublas_api.h
+# When install local library using pip/pip3, gcc version need to be set using the following command 
+# $ CC=/usr/bin/gcc-8 pip3 install pycryptopp
+#
+# 3. only lmdb is listed in the requirements.txt. It is actually python-lmdb needed, and it need to be installed with
+# $ conda install -c conda-forge python-lmdb
+#
+# 4. pytest is also required in testing, this is listed in tox.ini rather than requirements.txt
+#
+# 5. all samples are set into training kernel of PyTorch, which supports GPU, multi-GPU, CPU and TPU (Apple M1 not supported yet), and a selection of sample data are used as validation data to make sure nothing is wrong in the modeling process. Only the best k is selected as the final model, and the corresponding checkpoints are stored for testing and later usage.
+## 1. if (batchesID + 1) % total_val_batches == 0, the batch will be used as validation batch
+## 2. all correspoding calculation in pointnet2 are conducted using the precompiled and installed c++ library -- pointnet2_ops_lib
+
+
