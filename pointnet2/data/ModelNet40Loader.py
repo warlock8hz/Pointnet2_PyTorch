@@ -40,16 +40,21 @@ class ModelNet40Cls(data.Dataset):
             )
 
             if download and not os.path.exists(self.data_dir):
-                zipfile = os.path.join(BASE_DIR, os.path.basename(self.url))
-                subprocess.check_call(
-                    shlex.split("curl {} -o {}".format(self.url, zipfile))
-                )
-
-                subprocess.check_call(
-                    shlex.split("unzip {} -d {}".format(zipfile, BASE_DIR))
-                )
-
-                subprocess.check_call(shlex.split("rm {}".format(zipfile)))
+                www = 'https://shapenet.cs.stanford.edu/media/modelnet40_normal_resampled.zip'
+                zipfile = os.path.basename(www)
+                os.system('wget %s --no-check-certificate; unzip %s' % (www, zipfile))
+                os.system('mv %s %s' % (zipfile[:-4], BASE_DIR))
+                os.system('rm %s' % (zipfile))
+#                zipfile = os.path.join(BASE_DIR, os.path.basename(self.url))
+#                subprocess.check_call(
+#                    shlex.split("curl {} -o {}".format(self.url, zipfile))
+#                )
+#
+#                subprocess.check_call(
+#                    shlex.split("unzip {} -d {}".format(zipfile, BASE_DIR))
+#                )
+#
+#                subprocess.check_call(shlex.split("rm {}".format(zipfile)))
 
             self.train = train
             self.set_num_points(num_points)
