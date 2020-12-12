@@ -103,7 +103,7 @@ if __name__ == "__main__":
     dset = Indoor3DSemSeg(16, "./", train=True)
     print(dset[0])
     print(len(dset))
-    dloader = torch.utils.data.DataLoader(dset, batch_size=32, shuffle=True)
+    dloader = torch.utils.data.DataLoader(dset, batch_size=16, shuffle=True)
     for i, data in enumerate(dloader, 0):
         inputs, labels = data
         if i == len(dloader) - 1:

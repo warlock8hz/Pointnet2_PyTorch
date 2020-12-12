@@ -163,4 +163,4 @@ if __name__ == "__main__":
     print(dset[0][0])
     print(dset[0][1])
     print(len(dset))
-    dloader = torch.utils.data.DataLoader(dset, batch_size=32, shuffle=True)
+    dloader = torch.utils.data.DataLoader(dset, batch_size=16, shuffle=True)
