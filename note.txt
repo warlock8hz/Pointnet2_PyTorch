@@ -1,4 +1,4 @@
-# 0. cuda 10.1 and python 3.6/3.7/3.8 are required in running this reposity, NO tensorflow required 
+# 0. cuda 10.1 and python 3.6/3.7/3.8 are required in running this reposity, NO tensorflow required
 ## 1. training requires only python 3, this means 3.5/3.6/.../3.9 are theorically acceptable
 ## 2. tox.ini requires python 3.5 or 3.6, however, you can add 3.8 environment manually
 ## 3. the dependency (pytest-helpers-namespace) of tox requires python 2.7/3.4/3.5, but it seems good with 3.8
