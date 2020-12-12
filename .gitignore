@@ -22,3 +22,4 @@ pointnet2/data/modelnet40_normal_resampled/
 pointnet2/data/modelnet40_normal_resampled_cache/
 pointnet2/data/modelnet40_ply_hdf5_2048/
 outputs/
+venv/
