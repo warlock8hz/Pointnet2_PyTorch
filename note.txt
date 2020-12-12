@@ -1,7 +1,7 @@
-# 0. cuda 10.1 and python 3.5 are required in running this reposity
+# 0. cuda 10.1 and python 3.6/3.7/3.8 are required in running this reposity, NO tensorflow required 
 ## 1. training requires only python 3, this means 3.5/3.6/.../3.9 are theorically acceptable
-## 2. tox.ini requires python 3.5 or 3.6
-## 3. the dependency (pytest-helpers-namespace) of tox requires python 2.7/3.4/3.5
+## 2. tox.ini requires python 3.5 or 3.6, however, you can add 3.8 environment manually
+## 3. the dependency (pytest-helpers-namespace) of tox requires python 2.7/3.4/3.5, but it seems good with 3.8
 #
 # 1. make sure the cuda toolkit is properly installed (https://medium.com/@exesse/cuda-10-1-installation-on-ubuntu-18-04-lts-d04f89287130)
 ## 1. Start terminal and remove any NVIDIA traces you may have on your machine.
