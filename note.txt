@@ -53,5 +53,10 @@
 # 5. all samples are set into training kernel of PyTorch, which supports GPU, multi-GPU, CPU and TPU (Apple M1 not supported yet), and a selection of sample data are used as validation data to make sure nothing is wrong in the modeling process. Only the best k is selected as the final model, and the corresponding checkpoints are stored for testing and later usage.
 ## 1. if (batchesID + 1) % total_val_batches == 0, the batch will be used as validation batch
 ## 2. all correspoding calculation in pointnet2 are conducted using the precompiled and installed c++ library -- pointnet2_ops_lib
+#
+# 6. In order to correctly invoke the gcc8, you may need to add a link of gcc8 in the folder of cuda by
+## sudo ln -s /usr/bin/gcc-8 /usr/local/cuda/bin/gcc
+
+
 
 
