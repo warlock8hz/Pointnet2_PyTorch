@@ -143,6 +143,18 @@ class PointNet2ClassificationSSG(pl.LightningModule):
 
         return dict(val_loss=loss, val_acc=acc)
 
+    def validate_once(self, batch, batch_idx):
+        pc, labels = batch
+
+        logits = self.forward(pc)
+        loss = F.cross_entropy(logits, labels)
+        with torch.no_grad():
+            label_res = torch.argmax(logits, dim=1)
+
+        log = dict(train_loss=loss, label=label_res)
+
+        return dict(loss=loss, log=log)
+
     def validation_end(self, outputs):
         reduced_outputs = {}
         for k in outputs[0]:
