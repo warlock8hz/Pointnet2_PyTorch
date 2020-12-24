@@ -25,3 +25,5 @@ outputs/
 venv/
 CKPT/
 .idea/
+pointnet2/data/_uu_cache_backup/
+pointnet2/data/uu_cache/
