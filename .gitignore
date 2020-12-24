@@ -27,3 +27,5 @@ CKPT/
 .idea/
 pointnet2/data/_uu_cache_backup/
 pointnet2/data/uu_cache/
+pointnet2/data/modelnet40_normal_resampled_backup/
+pointnet2/data/modelnet40_normal_resampled_cache__/

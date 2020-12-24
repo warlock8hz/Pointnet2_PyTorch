@@ -31,6 +31,7 @@ class ModelNet40Cls(data.Dataset):
 
         self.set_num_points(num_points)
         self._cache = os.path.join(BASE_DIR, "modelnet40_normal_resampled_cache")
+        self._uu_cache = os.path.join(BASE_DIR, "uu_cache")
 
         if not osp.exists(self._cache):
             self.folder = "modelnet40_normal_resampled"
@@ -111,7 +112,66 @@ class ModelNet40Cls(data.Dataset):
 
             shutil.rmtree(self.data_dir)
 
-        self._lmdb_file = osp.join(self._cache, "train" if train else "test")
+        if not osp.exists(self._uu_cache):
+            self.folder = "uu_cache"
+            self.data_dir = os.path.join(BASE_DIR, self.folder)
+
+            self.train = train
+            self.set_num_points(num_points)
+
+            self.catfile = os.path.join(self.data_dir, "modelnet41_shape_names.txt")
+            self.cat = [line.rstrip() for line in open(self.catfile)]
+            self.classes = dict(zip(self.cat, range(len(self.cat))))
+
+            #os.makedirs(self._cache)
+
+            print("Converted to LMDB for faster dataloading while training")
+            for split in ["train", "test"]:
+                if split == "train":
+                    shape_ids = [
+                        line.rstrip()
+                        for line in open(
+                            os.path.join(self.data_dir, "modelnet41_train.txt")
+                        )
+                    ]
+                else:
+                    shape_ids = [
+                        line.rstrip()
+                        for line in open(
+                            os.path.join(self.data_dir, "modelnet41_test.txt")
+                        )
+                    ]
+
+                shape_names = ["_".join(x.split("_")[0:-1]) for x in shape_ids]
+                # list of (shape_name, shape_txt_file_path) tuple
+                self.datapath = [
+                    (
+                        shape_names[i],
+                        os.path.join(self.data_dir, shape_names[i], shape_ids[i])
+                        + ".txt",
+                    )
+                    for i in range(len(shape_ids))
+                ]
+
+                with lmdb.open(
+                        osp.join(self._uu_cache, split), map_size=1 << 36
+                ) as lmdb_env, lmdb_env.begin(write=True) as txn:
+                    for i in tqdm.trange(len(self.datapath)):
+                        fn = self.datapath[i]
+                        point_set = np.loadtxt(fn[1], delimiter=",").astype(np.float32)
+                        cls = self.classes[self.datapath[i][0]]
+                        cls = int(cls)
+
+                        txn.put(
+                            str(i).encode(),
+                            msgpack_numpy.packb(
+                                dict(pc=point_set, lbl=cls), use_bin_type=True
+                            ),
+                        )
+
+            #shutil.rmtree(self.data_dir)
+
+        self._lmdb_file = osp.join(self._uu_cache, "train" if train else "test")
         with lmdb.open(self._lmdb_file, map_size=1 << 36) as lmdb_env:
             self._len = lmdb_env.stat()["entries"]
 
