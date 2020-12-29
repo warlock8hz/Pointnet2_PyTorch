@@ -34,6 +34,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = '/home/g800g1/Projects/Pointnet2_PyTorch'
 CKPT_DIR = os.path.join(ROOT_DIR, 'CKPT')
 PC_DIR = os.path.join(BASE_DIR, 'data/modelnet40_normal_resampled')
+PC_SCALED_VALVE_DIR = os.path.join(BASE_DIR, 'data/scaled_valve')
 pc_path = os.path.join(BASE_DIR, 'data/modelnet40_normal_resampled/', 'xbox/xbox_0013.txt')
 cls_name_path = os.path.join(PC_DIR, 'modelnet40_shape_names.txt')
 #sys.path.append(os.path.join(ROOT_DIR, 'utils'))
@@ -124,7 +125,7 @@ def main(cfg):
     if cfg.task_model == 'semseg':
         checkpoint_folder = 'sem-ssg'
 
-    checkpoint_path = os.path.join(CKPT_DIR, checkpoint_folder, 'best.ckpt')
+    checkpoint_path = os.path.join(CKPT_DIR, checkpoint_folder, 'best39_valve.ckpt')#'best39_valve_no_scale.ckpt')
     # Load checkpoint
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-5)
     checkpoint = torch.load(checkpoint_path)
@@ -135,16 +136,18 @@ def main(cfg):
     print("Loaded checkpoint %s (epoch: %d)"%(checkpoint_path, epoch))
     model.eval()  # set model to eval mode (for bn and dp)
 
-    fList = scanFolder(PC_DIR)
+    fList = scanFolder(PC_SCALED_VALVE_DIR)#(PC_DIR)
     fList.sort()
     B = 1
     model.cuda()  # move to cuda to work
+    total = len(fList)
+    correct = 0;
 
     for item in fList:
         # Load and preprocess input point cloud
         point_cloud = read_pcd_txt(item)
         pc = preprocess_point_cloud(point_cloud, 10000)
-        print('Loaded point cloud data: %s' % (item))
+        #print('Loaded point cloud data: %s' % (item))
 
         # Model inference
         inputs = {'point_clouds': torch.from_numpy(pc).to(device)}
@@ -155,8 +158,15 @@ def main(cfg):
             res = model.validate_once((inputs['point_clouds'], labels), None)
 
         toc = time.time()
-        print('Type: %d' % (res['log']['label']))
-        print('Inference time: %f' % (toc - tic))
+        if res['log']['label'] != 37:
+            print('Type: %d' % (res['log']['label']))
+            print('Inference time: %f' % (toc - tic))
+        if res['log']['label'] == 37: #valve
+            correct += 1
+
+    print('Total Correct: %d' % (correct))
+    print('Correct rate: %.3f' % (correct/total))
+
         #res['point_clouds'] = inputs['point_clouds']
     #end_points['point_clouds'] = inputs['point_clouds']
     #pred_map_cls = parse_predictions(end_points, eval_config_dict) bounding box generation
