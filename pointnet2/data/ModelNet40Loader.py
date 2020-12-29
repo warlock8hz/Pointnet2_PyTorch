@@ -31,7 +31,7 @@ class ModelNet40Cls(data.Dataset):
 
         self.set_num_points(num_points)
         self._cache = os.path.join(BASE_DIR, "modelnet40_normal_resampled_cache")
-        self._uu_cache = os.path.join(BASE_DIR, "uu_cache")
+        self._uu_cache = os.path.join(BASE_DIR, "_uu_cache")
 
         if not osp.exists(self._cache):
             self.folder = "modelnet40_normal_resampled"
@@ -123,7 +123,7 @@ class ModelNet40Cls(data.Dataset):
             self.cat = [line.rstrip() for line in open(self.catfile)]
             self.classes = dict(zip(self.cat, range(len(self.cat))))
 
-            #os.makedirs(self._cache)
+            os.makedirs(self._uu_cache)
 
             print("Converted to LMDB for faster dataloading while training")
             for split in ["train", "test"]:
@@ -171,7 +171,7 @@ class ModelNet40Cls(data.Dataset):
 
             #shutil.rmtree(self.data_dir)
 
-        self._lmdb_file = osp.join(self._uu_cache, "train" if train else "test")
+        self._lmdb_file = osp.join(self._cache, "train" if train else "test")
         with lmdb.open(self._lmdb_file, map_size=1 << 36) as lmdb_env:
             self._len = lmdb_env.stat()["entries"]
 
