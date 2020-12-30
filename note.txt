@@ -42,7 +42,7 @@
 # $ sudo ln -s /usr/local/cuda-10.2/targets/x86_64-linux/include/cublas_v2.h /usr/include/cublas_v2.h
 # and 
 # $ sudo ln -s /usr/local/cuda-10.2/targets/x86_64-linux/include/cublas_api.h /usr/include/cublas_api.h
-# When install local library using pip/pip3, gcc version need to be set using the following command 
+# In Ubuntu 20.04, when install local library using pip/pip3, gcc version need to be set using the following command
 # $ CC=/usr/bin/gcc-8 pip3 install pycryptopp
 #
 # 3. only lmdb is listed in the requirements.txt. It is actually python-lmdb needed, and it need to be installed with
