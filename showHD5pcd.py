@@ -39,23 +39,27 @@ for item in fList:
 
     f = h5py.File(item, 'r')
 
-    id = config.batch
+    #id = config.batch
     print("Keys %s" % f.keys())
     a_group_key = list(f.keys())[0]
     data = f['data'][:]
-    pt_data = data[:, :, 0:3]   # convert to three-column shape for open3D
+    pt_data = data[:, :, 6:10]   # convert to three-column shape for open3D
     label = f['label'][:]
     #print(data[999][4095])
     rgb = np.repeat(label[:, :, np.newaxis], 3, axis=2)
     rgb = rgb / np.amax(label)
 
-    pcd = o3d.geometry.PointCloud()
+    pcd_each = o3d.geometry.PointCloud()
+    pcd_comb = o3d.geometry.PointCloud()
 
-    pcd.points = o3d.utility.Vector3dVector(pt_data[id])
-    pcd.colors = o3d.utility.Vector3dVector(rgb[id])
+    #nD1, nD2, nD3 = pt_data.shape
+    for i in range(len(pt_data)):
+        pcd_each.points = o3d.utility.Vector3dVector(pt_data[i])
+        pcd_each.colors = o3d.utility.Vector3dVector(rgb[i])
+        pcd_comb += pcd_each
 
-    o3d.io.write_point_cloud(item+'.ply', pcd, True)
+    o3d.io.write_point_cloud(item+'.ply', pcd_comb, True) # True for write in ASCII
 
-    o3d.visualization.draw_geometries([pcd])
+    #o3d.visualization.draw_geometries([pcd])
 #o3d.draw_geometries(pcdMerged)
 
