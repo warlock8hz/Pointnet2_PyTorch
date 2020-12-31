@@ -31,7 +31,7 @@ import torch.nn as nn
 import torch.optim as optim
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = '/home/g800g1/Projects/Pointnet2_PyTorch'
+ROOT_DIR = '/home/en1060/Projects/Pointnet2_PyTorch'
 CKPT_DIR = os.path.join(ROOT_DIR, 'CKPT')
 PC_DIR = os.path.join(BASE_DIR, 'data/modelnet40_normal_resampled')
 PC_SCALED_VALVE_DIR = os.path.join(BASE_DIR, 'data/scaled_valve')
