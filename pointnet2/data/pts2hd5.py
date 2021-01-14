@@ -12,7 +12,7 @@ except:
     sys.exit(-1)
 
 GRID_DIMENTION = [0.5, 0.5]
-GRID_SAMPLE_NUM = 128
+GRID_SAMPLE_NUM = 4096
 
 def read_ply(filename):
     """ read XYZ point cloud from filename PLY file """
@@ -86,9 +86,10 @@ def getLocalOrigins(pc_array, centered_min, centered_max):
     return pc_origins, ptIdInGrid, grid_dim
 
 def getPtsFromId(pc_array, ptIds):
-    ptSelected = np.zeros((GRID_SAMPLE_NUM, 9), dtype=np.float)
+    ptSelected = np.zeros((GRID_SAMPLE_NUM, 9), dtype=np.float32)
     for ida in range(len(ptIds)):
         ptSelected[ida] = pc_array[ptIds[ida]]
+    #ptSelected[ida] = np.float32(ptSelected)
     return ptSelected
 
 def getPtIdsIn8Neighbors(ptIdInGrid, centerGridId, grid_dim):
@@ -146,10 +147,10 @@ def getNormalizedHD5s(pc_array, pc_origins, ptIdInGrid, grid_dim):
         totalLayers += math.ceil(len(ptIdInGrid[ida]) / GRID_SAMPLE_NUM)
     print('%s x %s in HDF5' % (totalLayers, GRID_SAMPLE_NUM))
 
-    a_data = np.zeros((totalLayers, GRID_SAMPLE_NUM, 9), dtype=np.float)
+    a_data = np.zeros((totalLayers, GRID_SAMPLE_NUM, 9), dtype=np.float32)
     a_pid = np.zeros((totalLayers, GRID_SAMPLE_NUM), dtype=np.uint8)
 
-    # a_data_tempInLoop = np.zeros((GRID_SAMPLE_NUM, 9), dtype=np.float)
+    # a_data_tempInLoop = np.zeros((GRID_SAMPLE_NUM, 9), dtype=np.float32)
     ids_InLoop = []
     num_layer = 0
     for ida in range(len(ptIdInGrid)):
@@ -222,10 +223,18 @@ def center2origin(pc_array):# move center to zero origin
     centered_min = pc_array.min(axis=0)[0:3]
     return center, centered_max, centered_min
 
-def convertHD5(pc_array):
+def ply2hdf5(filename, hdf5_filename):
+    #filename = '/home/en1060/Desktop/classroom-ss.ply'
+    pc_array = read_ply(filename)
+    center, centered_max, centered_min = center2origin(pc_array)
+    pc_origins, ptIdInGrid, grid_dim = getLocalOrigins(pc_array, centered_min, centered_max)
+    a_data, a_pid = getNormalizedHD5s(pc_array, pc_origins, ptIdInGrid, grid_dim)
 
+    #f = h5py.File("/home/en1060/Desktop/classroom-ss.h5", 'w')
+    f = h5py.File(hdf5_filename, 'w')
+    data = f.create_dataset("data", data=a_data)
+    pid = f.create_dataset("label", data=a_pid)
 
-    print('not finished')
     return
 
 def main():
@@ -236,10 +245,11 @@ def main():
     a_data, a_pid = getNormalizedHD5s(pc_array, pc_origins, ptIdInGrid, grid_dim)
 
     f = h5py.File("/home/en1060/Desktop/classroom-ss.h5", 'w')
+    #f = h5py.File(hdf5_filename, 'w')
     data = f.create_dataset("data", data=a_data)
     pid = f.create_dataset("label", data=a_pid)
 
-    print(0)
+    return
 
 
 if __name__ == '__main__':
