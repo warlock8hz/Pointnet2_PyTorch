@@ -4,6 +4,8 @@ import numpy as np
 import math
 import random
 import h5py
+import codecs
+
 try:
     from plyfile import PlyData, PlyElement
 except:
@@ -11,8 +13,8 @@ except:
     print("pip install plyfile")
     sys.exit(-1)
 
-GRID_DIMENTION = [0.5, 0.5]
-GRID_SAMPLE_NUM = 4096
+GRID_DIMENTION = [1.0, 1.0]
+GRID_SAMPLE_NUM = 180#4096
 
 def read_ply(filename):
     """ read XYZ point cloud from filename PLY file """
@@ -50,6 +52,7 @@ def getGridPos(pt, biased_centered_min, grid_dim):
 
 def getLocalOrigins(pc_array, centered_min, centered_max):
     biased_centered_min = [centered_min[0] - 0.01, centered_min[1] - 0.01, centered_min[2]]
+    biased_centered_min = np.float32(biased_centered_min)
     grid_dim = [0,0]
     grid_dim[0] = math.ceil((centered_max[0] - biased_centered_min[0]) / GRID_DIMENTION[0]) * 2 - 1
     grid_dim[1] = math.ceil((centered_max[1] - biased_centered_min[1]) / GRID_DIMENTION[1]) * 2 - 1
@@ -91,6 +94,11 @@ def getPtsFromId(pc_array, ptIds):
         ptSelected[ida] = pc_array[ptIds[ida]]
     #ptSelected[ida] = np.float32(ptSelected)
     return ptSelected
+def getLabelsFromId(label_list, ptIds):
+    labelSelected = []
+    for ida in range(len(ptIds)):
+        labelSelected.append(label_list[ptIds[ida]])
+    return labelSelected
 
 def getPtIdsIn8Neighbors(ptIdInGrid, centerGridId, grid_dim):
     ptIdsInNeighbor = []
@@ -119,14 +127,37 @@ def getPtIdsIn8Neighbors(ptIdInGrid, centerGridId, grid_dim):
             ptIdsInNeighbor = ptIdsInNeighbor + ptIdInGrid[localSearchCtr + 1]
     return ptIdsInNeighbor
 
+def getNormalizedVal(rawVal, range, minVal):
+    normalizedVal = (rawVal - minVal)/range
+    return normalizedVal
+
 def getNormalized(a_data, pc_origin):
     for ida in range(len(a_data)):
         a_data[ida][0] -= pc_origin[0]
         a_data[ida][1] -= pc_origin[1]
         a_data[ida][2] -= pc_origin[2]
+        a_data[ida][3] = a_data[ida][3] / 255
+        a_data[ida][4] = a_data[ida][4] / 255
+        a_data[ida][5] = a_data[ida][5] / 255
+
+    # get normalized
+    centered_max = a_data.max(axis=0)[0:3]
+    #centered_max = np.float32(centered_max)
+    centered_min = a_data.min(axis=0)[0:3]
+    centered_range = [centered_max[0] - centered_min[0],
+                      centered_max[1] - centered_min[1],
+                      centered_max[2] - centered_min[2]]
+
+    for ida in range(len(a_data)):
+        a_data[ida][6] = getNormalizedVal(a_data[ida][0], centered_range[0], centered_min[0])
+        a_data[ida][7] = getNormalizedVal(a_data[ida][1], centered_range[1], centered_min[1])
+        a_data[ida][8] = getNormalizedVal(a_data[ida][2], centered_range[2], centered_min[2])
+
     return
 
-def getNormalizedHD5s(pc_array, pc_origins, ptIdInGrid, grid_dim):
+def getNormalizedHD5s(pc_array, label_list, pc_origins, ptIdInGrid, grid_dim):
+    # uint8 label can only be generate after all classes and hdf5 databases generated
+    D2label_list = [] # will change from 1D to 2D
     pc_localarray = pc_array.copy()
     pc_localarray = np.c_[pc_localarray, pc_localarray[..., 0:3]]
 
@@ -149,6 +180,7 @@ def getNormalizedHD5s(pc_array, pc_origins, ptIdInGrid, grid_dim):
 
     a_data = np.zeros((totalLayers, GRID_SAMPLE_NUM, 9), dtype=np.float32)
     a_pid = np.zeros((totalLayers, GRID_SAMPLE_NUM), dtype=np.uint8)
+    a_origins = np.zeros((totalLayers, 3), dtype=np.float32)
 
     # a_data_tempInLoop = np.zeros((GRID_SAMPLE_NUM, 9), dtype=np.float32)
     ids_InLoop = []
@@ -168,7 +200,9 @@ def getNormalizedHD5s(pc_array, pc_origins, ptIdInGrid, grid_dim):
                 num_processed_InLoop += 1
                 if num_processed_InLoop == GRID_SAMPLE_NUM:
                     a_data[num_layer] = getPtsFromId(pc_localarray, ids_InLoop)
+                    D2label_list.append(getLabelsFromId(label_list, ids_InLoop))
                     getNormalized(a_data[num_layer], pc_origins[ida])
+                    a_origins[num_layer] = pc_origins[ida]
                     num_layer_in_grid += 1
                     num_layer += 1
                     num_processed_InLoop = 0
@@ -181,7 +215,9 @@ def getNormalizedHD5s(pc_array, pc_origins, ptIdInGrid, grid_dim):
                 ids_InLoop = ptIdSubset[0:GRID_SAMPLE_NUM - num_processed_InLoop] \
                              + ptIdInGrid[ida][num_layer_in_grid * GRID_SAMPLE_NUM:num_processed_max]
                 a_data[num_layer] = getPtsFromId(pc_localarray, ids_InLoop)
+                D2label_list.append(getLabelsFromId(label_list, ids_InLoop))
                 getNormalized(a_data[num_layer], pc_origins[ida])
+                a_origins[num_layer] = pc_origins[ida]
                 num_layer += 1
                 num_processed_InLoop = 0
                 ids_InLoop = []
@@ -199,12 +235,21 @@ def getNormalizedHD5s(pc_array, pc_origins, ptIdInGrid, grid_dim):
                 random.shuffle(local_duplicate)
                 ids_InLoop = ids_InLoop + local_duplicate[0:GRID_SAMPLE_NUM - len(ids_InLoop)]
             a_data[num_layer] = getPtsFromId(pc_localarray, ids_InLoop)
+            D2label_list.append(getLabelsFromId(label_list, ids_InLoop))
             getNormalized(a_data[num_layer], pc_origins[ida])
+            a_origins[num_layer] = pc_origins[ida]
             num_layer += 1
             ids_InLoop = []
             ptIdInNeighbor = []
 
-    return a_data, a_pid
+    return a_data, a_pid, a_origins, D2label_list
+
+def addBias2pts(data, origins):
+    for idx in range(len(data)):
+        data[idx][0] += origins[0]
+        data[idx][1] += origins[1]
+        data[idx][2] += origins[2]
+    return
 
 def center2origin(pc_array):# move center to zero origin
     #pc_cen = pc_array
@@ -223,31 +268,146 @@ def center2origin(pc_array):# move center to zero origin
     centered_min = pc_array.min(axis=0)[0:3]
     return center, centered_max, centered_min
 
-def ply2hdf5(filename, hdf5_filename):
-    #filename = '/home/en1060/Desktop/classroom-ss.ply'
-    pc_array = read_ply(filename)
-    center, centered_max, centered_min = center2origin(pc_array)
-    pc_origins, ptIdInGrid, grid_dim = getLocalOrigins(pc_array, centered_min, centered_max)
-    a_data, a_pid = getNormalizedHD5s(pc_array, pc_origins, ptIdInGrid, grid_dim)
-
-    #f = h5py.File("/home/en1060/Desktop/classroom-ss.h5", 'w')
-    f = h5py.File(hdf5_filename, 'w')
-    data = f.create_dataset("data", data=a_data)
-    pid = f.create_dataset("label", data=a_pid)
-
-    return
-
-def main():
+def ply2hdf5data(filename):#ply file only has no label information
     filename = '/home/en1060/Desktop/classroom-ss.ply'
     pc_array = read_ply(filename)
     center, centered_max, centered_min = center2origin(pc_array)
     pc_origins, ptIdInGrid, grid_dim = getLocalOrigins(pc_array, centered_min, centered_max)
-    a_data, a_pid = getNormalizedHD5s(pc_array, pc_origins, ptIdInGrid, grid_dim)
+    label_list = [""]*len(pc_array)
+    a_data, a_label, a_origins, D2label_list = getNormalizedHD5s(pc_array, label_list, pc_origins, ptIdInGrid, grid_dim)
 
-    f = h5py.File("/home/en1060/Desktop/classroom-ss.h5", 'w')
+    # f = h5py.File("/home/en1060/Desktop/classroom-ss.h5", 'w')
+    # #f = h5py.File(hdf5_filename, 'w')
+    # data = f.create_dataset("data", data=a_data)
+    # pid = f.create_dataset("label", data=a_label)
+
+    return a_data, a_label, a_origins, center
+def ply2hdf5file(filename):#ply file only has no label information
+    #filename = '/home/en1060/Desktop/classroom-ss.ply'
+    pc_array = read_ply(filename)
+    center, centered_max, centered_min = center2origin(pc_array)
+    pc_origins, ptIdInGrid, grid_dim = getLocalOrigins(pc_array, centered_min, centered_max)
+    label_list = [""]*len(pc_array)
+    a_data, a_label, a_origins, D2label_list = getNormalizedHD5s(pc_array, label_list, pc_origins, ptIdInGrid, grid_dim)
+
+    f = h5py.File(filename + ".h5", 'w')
     #f = h5py.File(hdf5_filename, 'w')
     data = f.create_dataset("data", data=a_data)
-    pid = f.create_dataset("label", data=a_pid)
+    pid = f.create_dataset("label", data=a_label)
+    return #a_data, a_label, a_origins
+
+def name2class(name):
+    # no dash at all
+    pos = name.find('_', 0, len(name))
+    if pos == -1:
+        pos = name.find('.asc', 0, len(name))
+        className = name[0:pos]
+    # only one dash allowed
+    else:
+        className = name[0:pos]
+    return className
+def scanAscFile(path, fList, nameList):
+    # List all files in a directory using scandir()
+    with os.scandir(path) as entries:
+        for entry in entries:
+            if entry.is_file() and entry.name.endswith('.asc'):
+                fList.append(os.path.join(path, entry.name))
+                nameList.append(name2class(entry.name))
+    return
+def folderPly2HDF5(path):
+    fList = []
+    nameList = []
+    for entry in os.listdir(path):
+        if os.path.isdir(os.path.join(path, entry)):
+            scanAscFile(os.path.join(path, entry), fList, nameList)
+    return
+def scanFolderInFolder(path):
+    folderList = []
+    sceneName = []
+    for entry in os.listdir(path):
+        if os.path.isdir(os.path.join(path, entry)):
+            folderList.append(os.path.join(path, entry))
+            sceneName.append(entry)
+    return folderList, sceneName
+def checkAddNewCat(nameList, catList):
+    for name in nameList:
+        res = -1
+        for idx, cat in enumerate(catList):
+            if name.lower() == cat.lower():
+                res = idx
+        if res < 0:
+            catList.append(name)
+    return
+def checkNameInCatList(name, catList):
+    res = -1
+    for idx, cat in enumerate(catList):
+        if name.lower() == cat.lower():
+            res = idx
+    if res < 0:
+        res = 255
+    return res
+def assignLabelVal2HD5labels(label_vals, catList, all_labelstrlist, all_labelvallist):
+    for id in range(len(all_labelvallist)):
+        for idx in range(len(all_labelvallist[id])):
+            for idy in range(len(all_labelvallist[id][idx])):
+                # pending label value: all_labelvallist[id][idx][idy] vs label string all_labelstrlist[id][idx][idy]
+                debugstr = all_labelstrlist[id][idx][idy]
+                res = checkNameInCatList(all_labelstrlist[id][idx][idy], catList)
+                all_labelvallist[id][idx][idy] = label_vals[res]
+    return
+def main():
+    path = "/home/en1060/Desktop/importh5/utility-ss"
+    folders, sceneNames = scanFolderInFolder(path)
+    all_filelist = []
+    all_pclist = []
+    all_labelvallist = []
+    all_labelstrlist = []
+    all_originlist = []
+    all_gridoriginlist = []
+    room_filelist = []
+    catList = []
+    for idx, folder in enumerate(folders):
+        all_filelist.append(sceneNames[idx])
+        pc_list = np.zeros((0, 6), dtype=np.float64)
+        label_list = []
+        fList = []
+        nameList = []
+        scanAscFile(folder, fList, nameList)
+        for ida, file in enumerate(fList):
+            with codecs.open(file, encoding='utf-8-sig') as f:
+                pcLocalList = np.loadtxt(f)
+            nameLocalList = [nameList[ida]] * len(pcLocalList)
+            pc_list = np.concatenate((pc_list, pcLocalList), axis=0)
+            label_list = label_list + nameLocalList
+        # pc and labels to hd5
+        center, centered_max, centered_min = center2origin(pc_list) # centerlized, need to be recovered in the future
+        pc_list = np.float32(pc_list)
+        pc_origins, ptIdInGrid, grid_dim = getLocalOrigins(pc_list, centered_min, centered_max)
+        # label_list from 1D to 2D, a_label reserved the space
+        a_data, a_label, a_origins, D2label_list = \
+            getNormalizedHD5s(pc_list, label_list, pc_origins, ptIdInGrid, grid_dim) # string list cannot be mutable
+        for idy in range(len(a_data)):
+            room_filelist.append('Area_' + str(idx) + '_site_' + str(idx))
+        checkAddNewCat(nameList, catList)
+
+        all_pclist.append(a_data)
+        all_labelvallist.append(a_label)
+        all_labelstrlist.append(D2label_list)
+        all_originlist.append(pc_origins)
+        all_gridoriginlist.append(a_origins)
+
+    # assign uint8 value to labels
+    print("labels are assigned after indoor S3D labels (start from 14)")
+    uint8_label = np.zeros(len(catList), dtype=np.uint8)
+    for idx in range(len(uint8_label)):
+        uint8_label[idx] = 14 + idx
+    assignLabelVal2HD5labels(uint8_label, catList, all_labelstrlist, all_labelvallist)
+
+    for idx in range(len(all_pclist)):
+        f = h5py.File(os.path.join(path, sceneNames[idx] + ".h5"), 'w')
+        # f = h5py.File(hdf5_filename, 'w')
+        data = f.create_dataset("data", data=all_pclist[idx])
+        pid = f.create_dataset("label", data=all_labelvallist[idx])
 
     return
 
