@@ -16,6 +16,8 @@ import importlib
 import time
 from data import Indoor3DSemSegLoader as i3ssLoader
 import math
+import h5py
+from data import pts2hd5
 
 #parser = argparse.ArgumentParser()
 #parser.add_argument('--dataset', default='cls', help='Dataset: cls for classification or seg for segmentation [default: cls]')
@@ -109,6 +111,53 @@ def scanFolder(path):
             scanFile(os.path.join(path, entry), fList)
     return fList
 
+def returnIndoor3DLabels(label):
+    if label == 0:
+        return 'ceiling'
+    elif label == 1:
+        return 'floor'
+    elif label == 2:
+        return 'wall'
+    elif label == 3:
+        return 'column'
+    elif label == 4:
+        return 'beam'
+    elif label == 5:
+        return 'window'
+    elif label == 6:
+        return 'door'
+    elif label == 7:
+        return 'table'
+    elif label == 8:
+        return 'chair'
+    elif label == 9:
+        return 'bookcase'
+    elif label == 10:
+        return 'sofa'
+    elif label == 11:
+        return 'board'
+    elif label == 12:
+        return 'clutter'
+    else:
+        return 'unknown'
+    return 'unknown' # if error
+
+def hd5prediction2txt(data, label, origins, filename, center):
+    pt_data = data[:, :, 0:3]  # convert to three-column shape for open3D
+
+    with open(filename + '.txt', 'a') as the_file:
+        the_file.write('Hello\n')
+        for i in range(len(pt_data)):
+            pts2hd5.addBias2pts(pt_data[i], origins[i])
+            pt_data[i] = np.float64(pt_data[i]) # prepare to recover the coordinates
+            pts2hd5.addBias2pts(pt_data[i], center)
+            for j in range(len(pt_data[i])):
+                the_file.write('%.5f, %.5f, %.5f, %s, ' % (pt_data[i][j][0], pt_data[i][j][1],
+                                                         pt_data[i][j][2], label[i][j]))
+                the_file.write(returnIndoor3DLabels(label[i][j]))
+                the_file.write('\n')
+    return
+
 @hydra.main("config/config.yaml")
 #@pytest.mark.parametrize("use_xyz", ["True", "False"])
 #@pytest.mark.parametrize("model", ["ssg", "msg"])
@@ -130,7 +179,8 @@ def main(cfg):
         checkpoint_folder = 'sem-ssg'
         checkpoint_path = os.path.join(CKPT_DIR, checkpoint_folder, 'best869.ckpt')#'best39_valve_no_scale.ckpt')
         fList = []
-        scanH5File(H5_DIR, fList)
+        #scanH5File(H5_DIR, fList)
+        scanH5File('/home/en1060/Desktop/importh5', fList)
         fList.sort()
 
     # Load checkpoint
@@ -151,13 +201,13 @@ def main(cfg):
     if cfg.task_model.name == 'sem-ssg':
         for item in fList:
             print(sequenceID)
-            sequenceID += 1
-            pts, labels = i3ssLoader._load_data_file(item)
+            #pts, labels = i3ssLoader._load_data_file(item)
+            pts, labels, origins, center = pts2hd5.ply2hdf5data(item)
             group_GRAM = math.floor(len(pts) / N_GRAM)
 
             for i_GRAM in range(group_GRAM + 1):
                 correct = 0
-                print('\t.%d' % i_GRAM)
+                print('\t%d.%d' % (sequenceID, i_GRAM))
 
                 N_start = i_GRAM * N_GRAM
                 N_end = (i_GRAM + 1) * N_GRAM
@@ -181,16 +231,23 @@ def main(cfg):
                 toc = time.time()
                 pl = predicted_labels.cpu().detach().numpy()
 
-                for idx in range(len(pl)):
-                    for idy in range(len(pl[idx])):
-                        if pl[idx][idy] == labels_GRAM[idx][idy]:
-                            correct += 1
+                # for idx in range(len(pl)):
+                #     for idy in range(len(pl[idx])):
+                #         if pl[idx][idy] == labels_GRAM[idx][idy]:
+                #             correct += 1
+                #
+                # total = pts_GRAM.shape[0] * pts_GRAM.shape[1]
+                #
+                # print(correct / total)
+                labels[N_start:N_end, ...] = pl
 
-                total = pts_GRAM.shape[0] * pts_GRAM.shape[1]
+            # f = h5py.File("/home/en1060/Desktop/importh5/classroom_predict.h5", 'w')
+            # f = h5py.File(item + 'predict.h5', 'w')
+            # data = f.create_dataset("data", data=pts)
+            # pid = f.create_dataset("label", data=labels)
+            hd5prediction2txt(pts, labels, origins, item, center)
 
-                print(correct / total)
-
-        print("finished!")
+            sequenceID += 1
 
     else:#classification
         for item in fList:
