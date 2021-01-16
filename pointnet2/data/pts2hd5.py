@@ -14,7 +14,7 @@ except:
     sys.exit(-1)
 
 GRID_DIMENTION = [1.0, 1.0]
-GRID_SAMPLE_NUM = 180#4096
+GRID_SAMPLE_NUM = 4096
 
 def read_ply(filename):
     """ read XYZ point cloud from filename PLY file """
