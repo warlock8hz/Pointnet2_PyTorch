@@ -10,6 +10,7 @@
 
 import os
 import sys
+sys.path.append(".")
 import numpy as np
 import argparse
 import importlib
@@ -130,7 +131,7 @@ def main(cfg):
 
     if cfg.task_model.name == 'sem-ssg':
         checkpoint_folder = 'sem-ssg'
-        checkpoint_path = os.path.join(CKPT_DIR, checkpoint_folder, 'best869.ckpt')#'best39_valve_no_scale.ckpt')
+        checkpoint_path = os.path.join(CKPT_DIR, checkpoint_folder, 'utility_predict0130.5-6_epoch=46-val_loss=0.62-val_acc=0.874.ckpt')#'eutility_poch=34-val_loss=0.78-val_acc=0.859.ckpt')#'best869.ckpt')#'best39_valve_no_scale.ckpt')
         fList = []
         #scanH5File(H5_DIR, fList)
         scanH5File('/home/en1060/Desktop/importh5', fList)
@@ -152,9 +153,13 @@ def main(cfg):
     sequenceID = 0
 
     if cfg.task_model.name == 'sem-ssg':
-        for item in fList:
+        if True: # regular check for hdf5 scenes
+            #for item in fList:
+            item = "/home/en1060/Desktop/importh5/_1-PTS_CHD0130.5-0130.6.ply"
             print(sequenceID)
             #pts, labels = i3ssLoader._load_data_file(item)
+            #pts, labels, origins, center = pts2hd5.ply2hdf5data(item)
+            #pts2hd5.asc2hdf5dataSingleScene(item)
             pts, labels, origins, center = pts2hd5.ply2hdf5data(item)
             group_GRAM = math.floor(len(pts) / N_GRAM)
 
@@ -184,14 +189,15 @@ def main(cfg):
                 toc = time.time()
                 pl = predicted_labels.cpu().detach().numpy()
 
-                # for idx in range(len(pl)):
-                #     for idy in range(len(pl[idx])):
-                #         if pl[idx][idy] == labels_GRAM[idx][idy]:
-                #             correct += 1
-                #
-                # total = pts_GRAM.shape[0] * pts_GRAM.shape[1]
-                #
-                # print(correct / total)
+                for idx in range(len(pl)):
+                    for idy in range(len(pl[idx])):
+                        if pl[idx][idy] == labels_GRAM[idx][idy]:
+                            correct += 1
+
+                total = pts_GRAM.shape[0] * pts_GRAM.shape[1]
+
+                print(correct / total)
+
                 labels[N_start:N_end, ...] = pl
 
             # f = h5py.File("/home/en1060/Desktop/importh5/classroom_predict.h5", 'w')
@@ -201,6 +207,63 @@ def main(cfg):
             pts2hd5.hd5prediction2txt(pts, labels, origins, item, center)
 
             sequenceID += 1
+        else: # scene/folder-based check
+            path = '/home/en1060/Desktop/importh5/utility-test'
+            all_pclist, all_labelvallist, all_gridoriginlist, all_centers, all_filelist = \
+                pts2hd5.asc2hdf5dataSingleScene(path)
+            for id_file in range(len(all_pclist)):
+                print(sequenceID)
+                # pts, labels = i3ssLoader._load_data_file(item)
+                # pts, labels, origins, center = pts2hd5.ply2hdf5data(item)
+                group_GRAM = math.floor(len(all_pclist[id_file]) / N_GRAM)
+                labels = all_labelvallist[id_file].copy()
+
+                for i_GRAM in range(group_GRAM + 1):
+                    correct = 0
+                    print('\t%d.%d' % (sequenceID, i_GRAM))
+
+                    N_start = i_GRAM * N_GRAM
+                    N_end = (i_GRAM + 1) * N_GRAM
+                    if i_GRAM == group_GRAM:
+                        N_end = len(all_pclist[id_file])
+
+                    pts_GRAM = all_pclist[id_file][N_start:N_end, ...]
+                    labels_GRAM = all_labelvallist[id_file][N_start:N_end, ...]
+                    # data_batches = np.concatenate(pts, 0) # 3D to 2D
+                    # labels_batches = np.concatenate(labels, 0) # 3D to 2D
+
+                    # Model inference
+                    inputs = {'point_clouds': torch.from_numpy(pts_GRAM).to(device)}
+                    tic = time.time()
+                    with torch.no_grad():
+                        optimizer.zero_grad()
+                        predicted_labels = torch.from_numpy(
+                            np.random.randint(10, 11, size=(len(pts_GRAM), len(pts_GRAM[0])))).to(device)
+                        res = model.validate_once((inputs['point_clouds'], predicted_labels), None)
+                        predicted_labels = res['log']['label']
+
+                    toc = time.time()
+                    pl = predicted_labels.cpu().detach().numpy()
+
+                    for idx in range(len(pl)):
+                        for idy in range(len(pl[idx])):
+                            if pl[idx][idy] == labels_GRAM[idx][idy]:
+                                correct += 1
+
+                    total = pts_GRAM.shape[0] * pts_GRAM.shape[1]
+
+                    print(correct / total)
+
+                    labels[N_start:N_end, ...] = pl
+
+                # f = h5py.File("/home/en1060/Desktop/importh5/classroom_predict.h5", 'w')
+                # f = h5py.File(item + 'predict.h5', 'w')
+                # data = f.create_dataset("data", data=pts)
+                # pid = f.create_dataset("label", data=labels)
+                pts2hd5.hd5prediction2txt(all_pclist[id_file], labels, all_gridoriginlist[id_file],
+                                          os.path.join(path, all_filelist[id_file] + '.pred.txt'), all_centers[id_file])
+
+                sequenceID += 1
 
     else:#classification
         for item in fList:

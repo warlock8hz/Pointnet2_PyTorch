@@ -1,11 +1,12 @@
 import os
 import sys
+sys.path.append(".")
+
 import numpy as np
 import math
 import random
 import h5py
 import codecs
-import labelsCheckup
 
 try:
     from plyfile import PlyData, PlyElement
@@ -15,7 +16,98 @@ except:
     sys.exit(-1)
 
 GRID_DIMENTION = [1.0, 1.0]
-GRID_SAMPLE_NUM = 180#4096
+GRID_SAMPLE_NUM = 4096
+
+def returnIndoor3DLabels(label):
+    if label == 0:
+        return 'ceiling'
+    elif label == 1:
+        return 'floor'
+    elif label == 2:
+        return 'wall'
+    elif label == 3:
+        return 'column'
+    elif label == 4:
+        return 'beam'
+    elif label == 5:
+        return 'window'
+    elif label == 6:
+        return 'door'
+    elif label == 7:
+        return 'table'
+    elif label == 8:
+        return 'chair'
+    elif label == 9:
+        return 'bookcase'
+    elif label == 10:
+        return 'sofa'
+    elif label == 11:
+        return 'board'
+    elif label == 12:
+        return 'clutter'
+    elif label == 13:
+        return 'pipe'
+    elif label == 14:
+        return 'bend-box'
+    elif label == 15:
+        return 'valve'
+    elif label == 16:
+        return '90d-elbow'
+    elif label == 17:
+        return '22.5d-elbow'
+    elif label == 18:
+        return '45d-elbow'
+    elif label == 19:
+        return 'tee'
+    else: # should not happen
+        return 'unknownError'
+    return 'unknown' # if error
+
+def returnIndoor3DLabelIds(strName):
+    if strName.lower() == 'ceiling':
+        return 0
+    elif strName.lower() == 'floor':
+        return 1
+    elif strName.lower() == 'wall':
+        return 2
+    elif strName.lower() == 'column':
+        return 3
+    elif strName.lower() == 'beam':
+        return 4
+    elif strName.lower() == 'window':
+        return 5
+    elif strName.lower() == 'door':
+        return 6
+    elif strName.lower() == 'table':
+        return 7
+    elif strName.lower() == 'chair':
+        return 8
+    elif strName.lower() == 'bookcase':
+        return 9
+    elif strName.lower() == 'sofa':
+        return 10
+    elif strName.lower() == 'board':
+        return 11
+    elif strName.lower() == 'clutter':
+        return 12
+    elif strName.lower() == 'pipe':
+        return 13
+    elif strName.lower() == 'bend-box':
+        return 14
+    elif strName.lower() == 'valve':
+        return 15
+    elif strName.lower() == '90d-elbow':
+        return 16
+    elif strName.lower() == '22.5d-elbow':
+        return 17
+    elif strName.lower() == '45d-elbow':
+        return 18
+    elif strName.lower() == 'tee':
+        return 19
+    else: # should not happen
+        return 'unknownError'
+    return 255#should be error
+
 
 def read_ply(filename):
     """ read XYZ point cloud from filename PLY file """
@@ -73,6 +165,8 @@ def getLocalOrigins(pc_array, centered_min, centered_max):
 
     # val_res = np.zeros(N)
     for idx in range(len(pc_array)):
+        if idx % 500000 == 0:
+            print('%s of %s finished'%(idx, len(pc_array)))
         rows, cols = getGridPos(pc_array[idx], biased_centered_min, grid_dim)
         pt2grid.append([rows, cols])
 
@@ -270,17 +364,12 @@ def center2origin(pc_array):# move center to zero origin
     return center, centered_max, centered_min
 
 def ply2hdf5data(filename):#ply file only has no label information
-    filename = '/home/en1060/Desktop/classroom-ss.ply'
+    #filename = '/home/en1060/Desktop/classroom-ss.ply'
     pc_array = read_ply(filename)
     center, centered_max, centered_min = center2origin(pc_array)
     pc_origins, ptIdInGrid, grid_dim = getLocalOrigins(pc_array, centered_min, centered_max)
     label_list = [""]*len(pc_array)
     a_data, a_label, a_origins, D2label_list = getNormalizedHD5s(pc_array, label_list, pc_origins, ptIdInGrid, grid_dim)
-
-    # f = h5py.File("/home/en1060/Desktop/classroom-ss.h5", 'w')
-    # #f = h5py.File(hdf5_filename, 'w')
-    # data = f.create_dataset("data", data=a_data)
-    # pid = f.create_dataset("label", data=a_label)
 
     return a_data, a_label, a_origins, center
 def ply2hdf5file(filename):#ply file only has no label information
@@ -359,7 +448,7 @@ def assignLabelVal2HD5labels(all_labelstrlist, all_labelvallist):
     for id in range(len(all_labelvallist)):
         for idx in range(len(all_labelvallist[id])):
             for idy in range(len(all_labelvallist[id][idx])):
-                res = labelsCheckup.returnIndoor3DLabelIds(all_labelstrlist[id][idx][idy])
+                res = returnIndoor3DLabelIds(all_labelstrlist[id][idx][idy])
                 all_labelvallist[id][idx][idy] = res    #check if uint8
     return
 def hd5prediction2txt(data, label, origins, filename, center):
@@ -374,14 +463,80 @@ def hd5prediction2txt(data, label, origins, filename, center):
             for j in range(len(pt_data[i])):
                 the_file.write('%.5f, %.5f, %.5f, %s, ' % (pt_data[i][j][0], pt_data[i][j][1],
                                                          pt_data[i][j][2], label[i][j]))
-                the_file.write(labelsCheckup.returnIndoor3DLabels(label[i][j]))
+                the_file.write(returnIndoor3DLabels(label[i][j]))
                 the_file.write('\n')
     return
-def hd5origins2labelpc(hd5data, hd5label, origins, path):
+def asc2hdf5dataSingleScene(path):
+    path = "/home/en1060/Desktop/importh5/utility-test"
+    folders, sceneNames = scanFolderInFolder(path)
+    all_filelist = []
+    all_pclist = []
+    all_labelvallist = []
+    all_labelstrlist = []
+    all_originlist = []
+    all_gridoriginlist = []
+    all_centers = []
+    room_filelist = []
+    catList = []
+    for idx, folder in enumerate(folders):
+        all_filelist.append(sceneNames[idx])
+        pc_list = np.zeros((0, 6), dtype=np.float64)
+        label_list = []
+        fList = []
+        nameList = []
+        scanAscFile(folder, fList, nameList)
+        for ida, file in enumerate(fList):
+            with codecs.open(file, encoding='utf-8-sig') as f:
+                pcLocalList = np.loadtxt(f)
+            nameLocalList = [nameList[ida]] * len(pcLocalList)
+            pc_list = np.concatenate((pc_list, pcLocalList), axis=0)
+            label_list = label_list + nameLocalList
+        # pc and labels to hd5
+        center, centered_max, centered_min = center2origin(pc_list) # centerlized, need to be recovered in the future
+        pc_list = np.float32(pc_list)
+        pc_origins, ptIdInGrid, grid_dim = getLocalOrigins(pc_list, centered_min, centered_max)
+        # label_list from 1D to 2D, a_label reserved the space
+        a_data, a_label, a_origins, D2label_list = \
+            getNormalizedHD5s(pc_list, label_list, pc_origins, ptIdInGrid, grid_dim) # string list cannot be mutable
+        for idy in range(len(a_data)):
+            room_filelist.append('Area_' + str(idx) + '_site_' + str(idx))
+            with open(os.path.join(path, "room_filelist.txt"), "a") as text_file:
+                print(room_filelist[len(room_filelist) - 1], file=text_file)
+        with open(os.path.join(path, "all_files.txt"), "a") as text_file:
+            print(all_filelist[len(all_filelist) - 1] + ".h5", file=text_file)
 
-    return
-def main():
-    path = "/home/en1060/Desktop/importh5/utility-ss"
+        checkAddNewCat(nameList, catList)
+
+        all_pclist.append(a_data)
+        all_labelvallist.append(a_label)
+        all_labelstrlist.append(D2label_list)
+        all_originlist.append(pc_origins)
+        all_gridoriginlist.append(a_origins)
+        all_centers.append(center)
+
+    # assign uint8 value to labels
+    print("labels are assigned after indoor S3D labels (start from 14)")
+    if False: # only used when dont know if any new labels
+        num_known_cats = 13
+        uint8_label = np.zeros(len(catList), dtype=np.uint8)
+        for idx in range(len(uint8_label)):
+            uint8_label[idx] = 13 + idx
+        initialNassignLabelVal2HD5labels(uint8_label, catList, all_labelstrlist, all_labelvallist)
+    else:
+        assignLabelVal2HD5labels(all_labelstrlist, all_labelvallist)
+
+    for idx in range(len(all_pclist)):
+        #f = h5py.File(os.path.join(path, sceneNames[idx] + ".h5"), 'w')
+        #data = f.create_dataset("data", data=all_pclist[idx])
+        #pid = f.create_dataset("label", data=all_labelvallist[idx])
+
+        # check res here
+        hd5prediction2txt(all_pclist[idx], all_labelvallist[idx], all_gridoriginlist[idx],
+                          os.path.join(path, sceneNames[idx] + ".rawLabel.txt"), all_centers[idx])
+
+    return all_pclist, all_labelvallist, all_gridoriginlist, all_centers, all_filelist
+def asc2hdf5file(path):
+    path = "/home/en1060/Desktop/importh5/utility"
     folders, sceneNames = scanFolderInFolder(path)
     all_filelist = []
     all_pclist = []
@@ -446,12 +601,15 @@ def main():
         pid = f.create_dataset("label", data=all_labelvallist[idx])
 
         # check res here
-        if False:
+        if True:#False:
             hd5prediction2txt(all_pclist[idx], all_labelvallist[idx], all_gridoriginlist[idx],
                               os.path.join(path, sceneNames[idx] + ".txt"), all_centers[idx])
 
     return
-
+def main():
+    path = '/home'
+    asc2hdf5file(path)
+    return
 
 if __name__ == '__main__':
     main()
