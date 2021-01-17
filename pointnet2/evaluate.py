@@ -111,53 +111,6 @@ def scanFolder(path):
             scanFile(os.path.join(path, entry), fList)
     return fList
 
-def returnIndoor3DLabels(label):
-    if label == 0:
-        return 'ceiling'
-    elif label == 1:
-        return 'floor'
-    elif label == 2:
-        return 'wall'
-    elif label == 3:
-        return 'column'
-    elif label == 4:
-        return 'beam'
-    elif label == 5:
-        return 'window'
-    elif label == 6:
-        return 'door'
-    elif label == 7:
-        return 'table'
-    elif label == 8:
-        return 'chair'
-    elif label == 9:
-        return 'bookcase'
-    elif label == 10:
-        return 'sofa'
-    elif label == 11:
-        return 'board'
-    elif label == 12:
-        return 'clutter'
-    else:
-        return 'unknown'
-    return 'unknown' # if error
-
-def hd5prediction2txt(data, label, origins, filename, center):
-    pt_data = data[:, :, 0:3]  # convert to three-column shape for open3D
-
-    with open(filename + '.txt', 'a') as the_file:
-        the_file.write('Hello\n')
-        for i in range(len(pt_data)):
-            pts2hd5.addBias2pts(pt_data[i], origins[i])
-            pt_data[i] = np.float64(pt_data[i]) # prepare to recover the coordinates
-            pts2hd5.addBias2pts(pt_data[i], center)
-            for j in range(len(pt_data[i])):
-                the_file.write('%.5f, %.5f, %.5f, %s, ' % (pt_data[i][j][0], pt_data[i][j][1],
-                                                         pt_data[i][j][2], label[i][j]))
-                the_file.write(returnIndoor3DLabels(label[i][j]))
-                the_file.write('\n')
-    return
-
 @hydra.main("config/config.yaml")
 #@pytest.mark.parametrize("use_xyz", ["True", "False"])
 #@pytest.mark.parametrize("model", ["ssg", "msg"])
@@ -245,7 +198,7 @@ def main(cfg):
             # f = h5py.File(item + 'predict.h5', 'w')
             # data = f.create_dataset("data", data=pts)
             # pid = f.create_dataset("label", data=labels)
-            hd5prediction2txt(pts, labels, origins, item, center)
+            pts2hd5.hd5prediction2txt(pts, labels, origins, item, center)
 
             sequenceID += 1
 
