@@ -34,3 +34,5 @@ pointnet2/data/indoor3d_sem_seg_hdf5_data_visualization/
 pointnet2/data/raw_modelnet40_normal_resampled_cache/
 pointnet2/data/scaled_valve/
 pointnet2/data/scaled_valve_train/
+pointnet2/data/indoor3d_sem_seg_hdf5_data (another copy)/
+pointnet2/data/indoor3d_sem_seg_hdf5_data_backup/
