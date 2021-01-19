@@ -61,7 +61,7 @@ def returnIndoor3DLabels(label):
         return 'tee'
     else: # should not happen
         return 'unknownError'
-    return 'unknown' # if error
+    return 'unknownError' # if error
 
 def returnIndoor3DLabelIds(strName):
     if strName.lower() == 'ceiling':
@@ -105,7 +105,7 @@ def returnIndoor3DLabelIds(strName):
     elif strName.lower() == 'tee':
         return 19
     else: # should not happen
-        return 'unknownError'
+        return 255
     return 255#should be error
 
 
@@ -161,9 +161,12 @@ def getLocalOrigins(pc_array, centered_min, centered_max):
 
     # get the capacity of each grid
     pt2grid = []    # point in which grids
-    ptIdInGrid = [[]] * N   # points in the corresponding grid
+    ptIdInGrid = [[-1] * len(pc_array)] * N   # points in the corresponding grid
+    ptNumInGrid = [0] * N
 
     # val_res = np.zeros(N)
+    # get the statistics
+    print('first pass of grouping %s points for memory allocation' % len(pc_array))
     for idx in range(len(pc_array)):
         if idx % 500000 == 0:
             print('%s of %s finished'%(idx, len(pc_array)))
@@ -174,7 +177,34 @@ def getLocalOrigins(pc_array, centered_min, centered_max):
             for idb in range(len(cols)):
                 idc = cols[idb] * grid_dim[0] + rows[ida]
                 # val_res[idc] += 1
-                ptIdInGrid[idc] = ptIdInGrid[idc] + [idx]
+                #ptIdInGrid[idc] = ptIdInGrid[idc] + [idx]
+                #ptIdInGrid[idc][ptNumInGrid[idc]] = idx
+                ptNumInGrid[idc] += 1
+    print('%s of %s finished'%(len(pc_array), len(pc_array)))
+
+    # get the result list of lists prepared
+    print('memory allocation...')
+    for idb in range(grid_dim[1]):
+        for ida in range(grid_dim[0]):
+            idc = idb * grid_dim[0] + ida
+            ptIdInGrid[idc] = [0] * ptNumInGrid[idc]
+
+    # save to the list of lists
+    print('second pass: grouping %s points' % len(pc_array))
+    ptNumInGrid2save = [0] * N
+    for idx in range(len(pc_array)):
+        if idx % 500000 == 0:
+            print('%s of %s finished'%(idx, len(pc_array)))
+        rows = pt2grid[idx][0].copy() # retrieve the pos
+        cols = pt2grid[idx][1].copy() # retrieve the pos
+
+        for ida in range(len(rows)):
+            for idb in range(len(cols)):
+                idc = cols[idb] * grid_dim[0] + rows[ida]
+                #ptIdInGrid[idc] = ptIdInGrid[idc] + [idx]
+                ptIdInGrid[idc][ptNumInGrid2save[idc]] = idx
+                ptNumInGrid2save[idc] += 1
+    print('%s of %s finished'%(len(pc_array), len(pc_array)))
 
     # from corner points to origins in the grids
     for ida in range(len(pc_origins)):
@@ -456,9 +486,10 @@ def hd5prediction2txt(data, label, origins, filename, center):
 
     with open(filename + '.txt', 'a') as the_file:
         the_file.write('Hello\n')
+        pt_data = np.float64(pt_data)
         for i in range(len(pt_data)):
             addBias2pts(pt_data[i], origins[i])
-            pt_data[i] = np.float64(pt_data[i]) # prepare to recover the coordinates
+            #pt_data[i] = np.float64(pt_data[i]) # prepare to recover the coordinates
             addBias2pts(pt_data[i], center)
             for j in range(len(pt_data[i])):
                 the_file.write('%.5f, %.5f, %.5f, %s, ' % (pt_data[i][j][0], pt_data[i][j][1],
@@ -466,8 +497,38 @@ def hd5prediction2txt(data, label, origins, filename, center):
                 the_file.write(returnIndoor3DLabels(label[i][j]))
                 the_file.write('\n')
     return
+def asc2hdf5data_prediction(path):  # single asc file to single hdf5 data
+    D2labelVal_list = []
+    pc_list = np.zeros((0, 6), dtype=np.float64)
+    label_list = []
+    fList = []
+    nameList = []
+    scanAscFile(path, fList, nameList) # nameList is useless in prediction
+    nameList = ['unknown'] * len(fList)
+    for ida, file in enumerate(fList):
+        with codecs.open(file, encoding='utf-8-sig') as f:
+            pcLocalList = np.loadtxt(f)
+            pcLocalList = np.delete(pcLocalList, 3, 1)
+        nameLocalList = [nameList[ida]] * len(pcLocalList)
+        pc_list = np.concatenate((pc_list, pcLocalList), axis=0)
+        label_list = label_list + nameLocalList
+    print('%s points added'%len(pc_list))
+    # pc and labels to hd5
+    center, centered_max, centered_min = center2origin(pc_list) # centerlized, need to be recovered in the future
+    pc_list = np.float32(pc_list)
+    pc_origins, ptIdInGrid, grid_dim = getLocalOrigins(pc_list, centered_min, centered_max)
+    # label_list from 1D to 2D, a_label reserved the space
+    a_data, a_label, a_origins, D2label_list = \
+        getNormalizedHD5s(pc_list, label_list, pc_origins, ptIdInGrid, grid_dim) # string list cannot be mutable
+
+    D2label_list = [D2label_list]
+    D2labelVal_list = [a_label]
+    assignLabelVal2HD5labels(D2label_list, D2labelVal_list)
+    D2labelVal_list = D2labelVal_list[0]
+
+    return a_data, D2labelVal_list, a_origins, center
 def asc2hdf5dataSingleScene(path):
-    path = "/home/en1060/Desktop/importh5/utility-test"
+    #path = "/home/en1060/Desktop/importh5/utility-test"
     folders, sceneNames = scanFolderInFolder(path)
     all_filelist = []
     all_pclist = []
@@ -536,7 +597,7 @@ def asc2hdf5dataSingleScene(path):
 
     return all_pclist, all_labelvallist, all_gridoriginlist, all_centers, all_filelist
 def asc2hdf5file(path):
-    path = "/home/en1060/Desktop/importh5/utility"
+    #path = "/home/en1060/Desktop/importh5/utility"
     folders, sceneNames = scanFolderInFolder(path)
     all_filelist = []
     all_pclist = []
@@ -607,7 +668,7 @@ def asc2hdf5file(path):
 
     return
 def main():
-    path = '/home'
+    path = '/home/en1060/Desktop/importh5/utility_raw_resolution'
     asc2hdf5file(path)
     return
 
