@@ -389,6 +389,73 @@ def getNormalizedHD5s(pc_array, label_list, pc_origins, ptIdInGrid, grid_dim):
 
     return a_data, a_pid, a_origins, D2label_list
 
+def getNormalizedDSHD5s(pc_array, label_list, pc_origins, ptIdInGrid, grid_dim):
+    # uint8 label can only be generate after all classes and hdf5 databases generated
+    D2label_list = [] # will change from 1D to 2D
+    pc_localarray = pc_array.copy()
+    pc_localarray = np.c_[pc_localarray, pc_localarray[..., 0:3]]
+
+    # switch (val_res)
+    # case val_res < GRID_SAMPLE_NUM
+    #   get the points in the neighboring eight grids
+    #   if neighbors and val_res more than GRID_SAMPLE_NUM
+    #       random_shuffle only neighbors and make the 'val_res' enough
+    #   if neiighbors and val_res less than GRID_SAMPLE_NUM
+    #       random_shuffle all points, add to val_res, until more than GRID_SAMPLE_NUM, and dispose the rest
+    # case val_res > GRID_SAMPLE_NUM
+    #   random shuffle and devide into different groups
+    #   definitely the last group less than GRID_SAMPLE_NUM (if equal then fine)
+    #   random shuffle the all points in the original grid and make the 'val_res' enough
+
+    totalLayers = 0
+    for ida in range(len(ptIdInGrid)):
+        if len(ptIdInGrid[ida]) > 0:
+            totalLayers += 1
+        #totalLayers += math.ceil(len(ptIdInGrid[ida]) / GRID_SAMPLE_NUM)
+    print('%s x %s in HDF5' % (totalLayers, GRID_SAMPLE_NUM))
+
+    a_data = np.zeros((totalLayers, GRID_SAMPLE_NUM, 9), dtype=np.float32)
+    a_pid = np.zeros((totalLayers, GRID_SAMPLE_NUM), dtype=np.uint8)
+    a_origins = np.zeros((totalLayers, 3), dtype=np.float32)
+
+    # a_data_tempInLoop = np.zeros((GRID_SAMPLE_NUM, 9), dtype=np.float32)
+    ids_InLoop = []
+    num_layer = 0
+    for ida in range(len(ptIdInGrid)):
+        num_layer_in_grid = 0
+        random.shuffle(ptIdInGrid[ida])
+        if len(ptIdInGrid[ida]) == 0:
+            continue
+        elif len(ptIdInGrid[ida]) >= GRID_SAMPLE_NUM:
+            ids_InLoop = ptIdInGrid[ida][0:GRID_SAMPLE_NUM]
+            a_data[num_layer] = getPtsFromId(pc_localarray, ids_InLoop)
+            D2label_list.append(getLabelsFromId(label_list, ids_InLoop))
+            getNormalized(a_data[num_layer], pc_origins[ida])
+            a_origins[num_layer] = pc_origins[ida]
+            num_layer += 1
+            ids_InLoop = []
+        else:
+            ptIdInNeighbor = getPtIdsIn8Neighbors(ptIdInGrid, ida, grid_dim)
+            random.shuffle(ptIdInNeighbor)
+            ids_InLoop = ptIdInGrid[ida] + ptIdInNeighbor[0:GRID_SAMPLE_NUM - len(ptIdInGrid[ida])]
+            if len(ids_InLoop) == 0:
+                continue
+            if len(ids_InLoop) < GRID_SAMPLE_NUM:
+                local_duplicate = ids_InLoop.copy()
+                while len(ids_InLoop) + len(local_duplicate) < GRID_SAMPLE_NUM:
+                    ids_InLoop = ids_InLoop + local_duplicate
+                random.shuffle(local_duplicate)
+                ids_InLoop = ids_InLoop + local_duplicate[0:GRID_SAMPLE_NUM - len(ids_InLoop)]
+            a_data[num_layer] = getPtsFromId(pc_localarray, ids_InLoop)
+            D2label_list.append(getLabelsFromId(label_list, ids_InLoop))
+            getNormalized(a_data[num_layer], pc_origins[ida])
+            a_origins[num_layer] = pc_origins[ida]
+            num_layer += 1
+            ids_InLoop = []
+            ptIdInNeighbor = []
+
+    return a_data, a_pid, a_origins, D2label_list
+
 def addBias2pts(data, origins):
     for idx in range(len(data)):
         data[idx][0] += origins[0]
