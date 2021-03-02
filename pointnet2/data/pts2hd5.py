@@ -606,7 +606,7 @@ def asc2hdf5data_prediction(path):  # single asc file to single hdf5 data
     pc_origins, ptIdInGrid, grid_dim = getLocalOrigins(pc_list, centered_min, centered_max)
     # label_list from 1D to 2D, a_label reserved the space
     a_data, a_label, a_origins, D2label_list = \
-        getNormalizedHD5s(pc_list, label_list, pc_origins, ptIdInGrid, grid_dim) # string list cannot be mutable
+        getNormalizedDSHD5s(pc_list, label_list, pc_origins, ptIdInGrid, grid_dim) # string list cannot be mutable
 
     D2label_list = [D2label_list]
     D2labelVal_list = [a_label]
@@ -683,6 +683,13 @@ def asc2hdf5dataSingleScene(path):
                           os.path.join(path, sceneNames[idx] + ".rawLabel.txt"), all_centers[idx])
 
     return all_pclist, all_labelvallist, all_gridoriginlist, all_centers, all_filelist
+
+def debugGetPtNumVsClasses(D2LabelList):
+    num = [0] * 12
+    for idx in range(len(D2LabelList)):
+        for idy in range(len(D2LabelList[idx])):
+            num[returnIndoor3DLabelIds(D2LabelList[idx][idy])] += 1
+    return
 def asc2hdf5file(path):
     #path = "/home/en1060/Desktop/importh5/utility"
     folders, sceneNames = scanFolderInFolder(path)
@@ -696,6 +703,7 @@ def asc2hdf5file(path):
     room_filelist = []
     catList = []
     for idx, folder in enumerate(folders):
+        print(sceneNames[idx])
         all_filelist.append(sceneNames[idx])
         pc_list = np.zeros((0, 6), dtype=np.float64)
         label_list = []
@@ -713,6 +721,8 @@ def asc2hdf5file(path):
         pc_list = np.float32(pc_list)
         pc_origins, ptIdInGrid, grid_dim = getLocalOrigins(pc_list, centered_min, centered_max)
         # label_list from 1D to 2D, a_label reserved the space
+
+        # use getNormalizedDSHD5s here if new method is required
         a_data, a_label, a_origins, D2label_list = \
             getNormalizedHD5s(pc_list, label_list, pc_origins, ptIdInGrid, grid_dim) # string list cannot be mutable
         for idy in range(len(a_data)):
@@ -721,6 +731,7 @@ def asc2hdf5file(path):
                 print(room_filelist[len(room_filelist) - 1], file=text_file)
         with open(os.path.join(path, "all_files.txt"), "a") as text_file:
             print(all_filelist[len(all_filelist) - 1] + ".h5", file=text_file)
+        #debugGetPtNumVsClasses(D2label_list)
 
         checkAddNewCat(nameList, catList)
 
@@ -732,7 +743,7 @@ def asc2hdf5file(path):
         all_centers.append(center)
 
     # assign uint8 value to labels
-    print("labels are assigned after indoor S3D labels (start from 14)")
+    # print("labels are assigned after indoor S3D labels (start from 14)")
     if False: # only used when dont know if any new labels
         num_known_cats = 13
         uint8_label = np.zeros(len(catList), dtype=np.uint8)
@@ -755,7 +766,7 @@ def asc2hdf5file(path):
 
     return
 def main():
-    path = '/home/en1060/Desktop/importh5/utility_raw_resolution'
+    path = '/home/en1060/Desktop/importh5/utility_more_2'
     asc2hdf5file(path)
     return
 

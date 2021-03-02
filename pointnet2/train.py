@@ -30,13 +30,13 @@ def hydra_params_to_dotdict(hparams):
 def main(cfg):
     model = hydra.utils.instantiate(cfg.task_model, hydra_params_to_dotdict(cfg))
 
-    early_stop_callback = pl.callbacks.EarlyStopping(patience=5)
+    early_stop_callback = pl.callbacks.EarlyStopping(patience=100)
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
         monitor="val_acc",
         mode="max",
         save_top_k=2,
         filepath=os.path.join(
-            cfg.task_model.name, "{epoch}-{val_loss:.2f}-{val_acc:.3f}"
+            cfg.task_model.name, "{epoch}-{loss:.2f}-{train_acc:.2f}-{val_loss:.2f}-{val_acc:.3f}"
         ),
         verbose=True,
     )

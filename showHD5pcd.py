@@ -33,7 +33,7 @@ def main():
 
     #pathName = os.path.join(BASE_DIR, config.file_name)
     #pathName = '/home/en1060/Desktop/importh5'#/indoor3d_predict'
-    pathName = "/home/en1060/Desktop/importh5/utility-ss"
+    pathName = "/home/en1060/Desktop/importh5/utility_ss"
     fList = []
     scanFile(pathName, fList)  # get all files in the folder
     fList.sort()
